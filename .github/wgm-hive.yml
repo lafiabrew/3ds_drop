@@ -1,0 +1,9 @@
+# Consent for anonymized wgm lessons to be reported upstream automatically.
+consent: true
+auto_report: true
+
+sources:
+  - dogfood
+  - swarm
+  - issues
+  - cross-pollinate
