@@ -21,6 +21,9 @@ with open("build/3ds/3ds_drop.elf", "rb") as f:
 assert elf[:4] == b"\x7fELF", "Invalid ELF magic"
 e_machine = struct.unpack("<H", elf[18:20])[0]
 assert e_machine == 40, f"Expected ARM e_machine=40, got {e_machine}"
+import os
+elf_sz = os.path.getsize("build/3ds/3ds_drop.elf")
+assert elf_sz < 450000, f"Expected stripped ELF < 450KB, got {elf_sz}"
 
 with open("build/3ds/3ds_drop.smdh", "rb") as f:
     smdh = f.read()

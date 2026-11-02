@@ -42,7 +42,7 @@ test: host
 	@mkdir -p build/3ds
 	$(DEVKITARM)/bin/arm-none-eabi-gcc \
 		-march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft \
-		-std=gnu11 -Wall -Wextra -Werror -O2 -ffunction-sections -fdata-sections \
+		-std=gnu11 -Wall -Wextra -Werror -Os -flto -fomit-frame-pointer -ffunction-sections -fdata-sections \
 		-D__3DS__ -Iinclude \
 		-I$(DEVKITPRO)/libctru/include \
 		$(CORE_SRCS) src/platform_3ds.c src/main.c \
@@ -51,6 +51,7 @@ test: host
 		-Wl,--gc-sections \
 		-lcitro2d -lcitro3d -lctru -lm \
 		-o build/3ds/$(TARGET).elf
+	$(DEVKITARM)/bin/arm-none-eabi-strip --strip-debug build/3ds/$(TARGET).elf
 	$(DEVKITPRO)/tools/bin/smdhtool --create "$(APP_TITLE)" "$(APP_DESC)" "$(APP_AUTHOR)" meta/icon.png build/3ds/$(TARGET).smdh
 	python3 -c 'import sys; sys.path.insert(0, "meta"); from generate_bnr_shared import patch_smdh_for_cia; patch_smdh_for_cia("build/3ds/$(TARGET).smdh")'
 	$(DEVKITPRO)/tools/bin/3dsxtool build/3ds/$(TARGET).elf build/3ds/$(TARGET).3dsx --smdh=build/3ds/$(TARGET).smdh

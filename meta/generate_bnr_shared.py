@@ -157,9 +157,11 @@ def _lz11_decompress(data: bytes) -> bytes:
 
 
 def _lz11_compress(raw: bytes) -> bytes:
-    """Fast valid Nintendo LZ11 encoder (uses RLE / 2-byte lookback matches + literals)."""
+    """High-ratio Nintendo LZ11 encoder with 4KB hash-chain lookback and indicator-1 (up to 65808-byte) matches."""
     n = len(raw)
     out = bytearray([0x11, n & 0xFF, (n >> 8) & 0xFF, (n >> 16) & 0xFF])
+    # Direct 2-byte prefix hash table storing recent positions (capped to 16 entries per bucket for speed)
+    buckets: Dict[int, List[int]] = {}
     i = 0
     while i < n:
         flag_pos = len(out)
@@ -168,12 +170,28 @@ def _lz11_compress(raw: bytes) -> bytes:
         for bit in range(7, -1, -1):
             if i >= n:
                 break
-            # Check for run-length / 2-byte aligned repeat at disp=2 or disp=4 (common in 16bpp textures)
             best_len = 0
             best_disp = 0
-            max_l = min(0x110, n - i)
-            if max_l >= 3 and i >= 2:
-                for disp in (2, 4, 8, 16, 64, 128):
+            max_l = min(0x10110, n - i)
+            if max_l >= 3 and i >= 1:
+                key = (raw[i] << 8) | raw[i + 1]
+                cand_list = buckets.get(key)
+                if cand_list:
+                    for pos in reversed(cand_list[-16:]):
+                        disp = i - pos
+                        if disp > 0x1000:
+                            break
+                        if raw[i + 2] == raw[pos + 2]:
+                            l = 3
+                            while l < max_l and raw[i + l] == raw[pos + l]:
+                                l += 1
+                            if l > best_len:
+                                best_len = l
+                                best_disp = disp
+                                if best_len >= 512 or best_len == max_l:
+                                    break
+                # Always check disp=2 and disp=4 fast RLE paths for 16bpp/32bpp solid fills
+                for disp in (2, 4):
                     if i >= disp and raw[i] == raw[i - disp] and raw[i + 1] == raw[i + 1 - disp]:
                         l = 2
                         while l < max_l and raw[i + l] == raw[i + l - disp]:
@@ -181,8 +199,7 @@ def _lz11_compress(raw: bytes) -> bytes:
                         if l > best_len:
                             best_len = l
                             best_disp = disp
-                            if best_len == max_l:
-                                break
+
             if best_len >= 3:
                 flags |= 1 << bit
                 d = best_disp - 1
@@ -190,13 +207,27 @@ def _lz11_compress(raw: bytes) -> bytes:
                     l_code = best_len - 1
                     out.append((l_code << 4) | ((d >> 8) & 0x0F))
                     out.append(d & 0xFF)
-                else:
+                elif best_len <= 0x110:
                     l_code = best_len - 0x11
                     out.append((l_code >> 4) & 0x0F)
                     out.append(((l_code & 0x0F) << 4) | ((d >> 8) & 0x0F))
                     out.append(d & 0xFF)
+                else:
+                    l_code = best_len - 0x111
+                    out.append(0x10 | ((l_code >> 12) & 0x0F))
+                    out.append((l_code >> 4) & 0xFF)
+                    out.append(((l_code & 0x0F) << 4) | ((d >> 8) & 0x0F))
+                    out.append(d & 0xFF)
+                # Index stepped positions every 2 bytes
+                step_end = min(n - 2, i + best_len)
+                for p in range(i, step_end, 2):
+                    k = (raw[p] << 8) | raw[p + 1]
+                    buckets.setdefault(k, []).append(p)
                 i += best_len
             else:
+                if i + 2 <= n:
+                    k = (raw[i] << 8) | raw[i + 1]
+                    buckets.setdefault(k, []).append(i)
                 out.append(raw[i])
                 i += 1
         out[flag_pos] = flags
