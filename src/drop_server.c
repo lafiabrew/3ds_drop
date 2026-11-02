@@ -127,6 +127,11 @@ static void walk_sd_files(const char *sd_root, const char *rel_dir, int depth, j
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL && ctx->count < 64) {
         if (ent->d_name[0] == '.') continue;
+        if (depth == 0 && (strcmp(ent->d_name, "Nintendo 3DS") == 0 ||
+                           strcmp(ent->d_name, "System Volume Information") == 0 ||
+                           strcmp(ent->d_name, "boot9strap") == 0)) {
+            continue;
+        }
         char rel_child[DROP_PATH_MAX];
         if (rel_dir[0] == '\0') {
             snprintf(rel_child, sizeof(rel_child), "%s", ent->d_name);
@@ -335,7 +340,9 @@ static bool send_all_bounded(int fd, const uint8_t *data, size_t len, int timeou
         pfd.revents = 0;
         int pr = poll(&pfd, 1, timeout_ms);
         if (pr <= 0) return false;
-        ssize_t n = send(fd, data + sent, len - sent, 0);
+        size_t chunk = len - sent;
+        if (chunk > 1024u) chunk = 1024u;
+        ssize_t n = send(fd, data + sent, chunk, 0);
         if (n <= 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
             return false;
@@ -343,6 +350,20 @@ static bool send_all_bounded(int fd, const uint8_t *data, size_t len, int timeou
         sent += (size_t)n;
     }
     return true;
+}
+
+static void graceful_close_client(int cfd) {
+    shutdown(cfd, SHUT_WR);
+    uint8_t drain[128];
+    for (int i = 0; i < 6; i++) {
+        struct pollfd pfd;
+        pfd.fd = cfd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+        if (poll(&pfd, 1, 20) <= 0) break;
+        if (recv(cfd, drain, sizeof(drain), 0) <= 0) break;
+    }
+    close(cfd);
 }
 
 static void send_http_response(int fd, int status, const char *status_text,
@@ -354,12 +375,20 @@ static void send_http_response(int fd, int status, const char *status_text,
                         "Content-Length: %zu\r\n"
                         "Connection: close\r\n\r\n",
                         status, status_text, content_type, body_len);
-    if (hlen > 0) {
-        send_all_bounded(fd, (const uint8_t *)hdr, (size_t)hlen, 1000);
-    }
+    if (hlen < 0) return;
+    size_t hdr_len = (size_t)hlen;
     if (body != NULL && body_len > 0) {
-        send_all_bounded(fd, body, body_len, 1500);
+        size_t tot = hdr_len + body_len;
+        uint8_t *combined = (uint8_t *)malloc(tot);
+        if (combined != NULL) {
+            memcpy(combined, hdr, hdr_len);
+            memcpy(combined + hdr_len, body, body_len);
+            send_all_bounded(fd, combined, tot, 2000);
+            free(combined);
+            return;
+        }
     }
+    send_all_bounded(fd, (const uint8_t *)hdr, hdr_len, 1000);
 }
 
 static void extract_query_param(const char *uri, const char *key, char *out_val, size_t cap) {
@@ -457,7 +486,80 @@ bool drop_server_poll_once(drop_server_t *srv, int timeout_ms) {
 
     srv->requests_served++;
 
-    if (strncmp(uri, "/api/status", 11) == 0) {
+    if (strcmp(uri, "/") == 0 || strncmp(uri, "/?", 2) == 0 || strncmp(uri, "/index.html", 11) == 0) {
+        static const char k_html[] =
+            "<!doctype html><html><head><meta charset=\"utf-8\"/>"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"/>"
+            "<title>3DS Drop — Wireless SD Manager</title>"
+            "<style>"
+            "body{background:#0d1424;color:#eef3fc;font-family:system-ui,sans-serif;margin:0;padding:1.5rem;max-width:980px;margin:0 auto}"
+            "h1{color:#66e3ff;margin:0 0 .3rem 0}.sub{color:#9ab0d4;margin:0 0 1.2rem 0;font-size:.9rem}"
+            ".grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}"
+            "@media(max-width:700px){.grid{grid-template-columns:1fr}}"
+            ".card{background:#16223a;border:1px solid #2b426e;border-radius:12px;padding:1rem}"
+            "h2{margin:0 0 .6rem 0;font-size:1.05rem;color:#ffd86b}"
+            "input,button{padding:.48rem .7rem;border-radius:7px;border:1px solid #355084;background:#0b1120;color:#fff;font-size:.86rem}"
+            "button{background:#38c890;color:#08150f;font-weight:700;border:none;cursor:pointer}"
+            "button.sec{background:#34548a;color:#fff}"
+            "table{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.5rem}"
+            "th,td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid #223456}"
+            "a.dl{color:#66e3ff;text-decoration:none;font-weight:600}"
+            "pre{background:#090e1a;padding:.6rem;border-radius:7px;overflow-x:auto;font-size:.78rem;color:#b8d4ff;max-height:220px}"
+            ".tag{display:inline-block;padding:.1rem .45rem;border-radius:99px;font-size:.72rem;background:#243b63;color:#9ad1ff}"
+            "</style></head><body>"
+            "<h1>3DS Drop — Wireless SD Card &amp; Log Dashboard</h1>"
+            "<p class=\"sub\" id=\"status\">Connecting to 3DS...</p>"
+            "<div class=\"grid\">"
+            "<div class=\"card\"><h2>Upload Save / ROM / LayeredFS File</h2>"
+            "<p style=\"font-size:.8rem;color:#9ab0d4;margin:0 0 .5rem 0\">Existing files are automatically backed up to <code>.bak</code> before atomic overwrite.</p>"
+            "<div style=\"display:flex;flex-direction:column;gap:.5rem\">"
+            "<input type=\"file\" id=\"upFile\"/>"
+            "<input type=\"text\" id=\"upPath\" placeholder=\"SD path (e.g. 3ds/Checkpoint/saves/main or roms/gba/hack.sav)\"/>"
+            "<button onclick=\"uploadFile()\">Upload Atomically to 3DS SD</button>"
+            "<div id=\"upMsg\" style=\"font-size:.82rem;color:#66ffaa\"></div>"
+            "</div></div>"
+            "<div class=\"card\"><h2>Luma3DS Crash Dumps &amp; Diagnostic Logs</h2>"
+            "<button class=\"sec\" onclick=\"refreshAll()\">Refresh SD &amp; Logs</button>"
+            "<pre id=\"logsBox\">Loading logs...</pre></div>"
+            "</div>"
+            "<div class=\"card\"><h2>SD Card Files (Saves, LayeredFS Mods, Logs, Screenshots)</h2>"
+            "<table><thead><tr><th>Category</th><th>SD Relative Path</th><th>Size</th><th>Action</th></tr></thead>"
+            "<tbody id=\"fileRows\"></tbody></table></div>"
+            "<script>"
+            "document.getElementById('upFile').addEventListener('change',e=>{"
+            "const f=e.target.files[0];if(f&&!document.getElementById('upPath').value){"
+            "document.getElementById('upPath').value='3ds/drop/'+f.name;}});"
+            "async function refreshAll(){"
+            "const st=await (await fetch('/api/status')).json();"
+            "document.getElementById('status').textContent=`Connected to 3DS (${st.ip}:${st.port}) | SD Root: ${st.sd_root} | Requests: ${st.requests}`;"
+            "const sc=await (await fetch('/api/scan')).json();"
+            "const tb=document.getElementById('fileRows');tb.innerHTML='';"
+            "(sc.files||[]).forEach(f=>{"
+            "const tr=document.createElement('tr');"
+            "const u='/api/pull?path='+encodeURIComponent(f.path);"
+            "tr.innerHTML=`<td><span class='tag'>${f.category}</span></td><td><code>${f.path}</code></td><td>${f.size} B</td>"
+            "<td><a class='dl' href='${u}' download>Download</a> | <a class='dl' href='#' onclick=\"document.getElementById('upPath').value='${f.path}';return false;\">Target Overwrite</a></td>`;"
+            "tb.appendChild(tr);});"
+            "const lg=await (await fetch('/api/logs')).json();"
+            "document.getElementById('logsBox').textContent=(lg.logs||[]).map(l=>`[${l.type}] ${l.path} (${l.size} B)\\n  ${l.excerpt}`).join('\\n\\n')||'No crash dumps or logs found.';"
+            "}"
+            "async function uploadFile(){"
+            "const f=document.getElementById('upFile').files[0];"
+            "const p=document.getElementById('upPath').value.trim();"
+            "const m=document.getElementById('upMsg');"
+            "if(!f||!p){m.textContent='Choose a file and target SD path first.';return;}"
+            "m.textContent='Uploading...';"
+            "const buf=await f.arrayBuffer();"
+            "const r=await fetch('/api/push?path='+encodeURIComponent(p),{method:'POST',body:buf});"
+            "const j=await r.json();"
+            "m.textContent=r.ok?`Saved ${j.path} (${j.bytes} B, .bak backup created!)`:`Error: ${j.error}`;"
+            "refreshAll();}"
+            "refreshAll();"
+            "</script></body></html>\n";
+        send_http_response(cfd, 200, "OK", "text/html; charset=utf-8",
+                           (const uint8_t *)k_html, sizeof(k_html) - 1u);
+        snprintf(srv->last_event, sizeof(srv->last_event), "SERVED WEB UI DASHBOARD");
+    } else if (strncmp(uri, "/api/status", 11) == 0) {
         drop_detect_local_ip(srv->ip_addr, sizeof(srv->ip_addr));
         char body[320];
         int blen = snprintf(body, sizeof(body),
@@ -581,7 +683,7 @@ bool drop_server_poll_once(drop_server_t *srv, int timeout_ms) {
     }
 
     free(req);
-    close(cfd);
+    graceful_close_client(cfd);
     return true;
 }
 

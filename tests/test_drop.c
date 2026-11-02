@@ -88,6 +88,12 @@ int main(void) {
 
     char resp[16384];
 
+    /* GET / (Web UI Dashboard) */
+    send_and_service(&srv, "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n", resp, sizeof(resp));
+    assert(strstr(resp, "HTTP/1.1 200 OK") != NULL);
+    assert(strstr(resp, "3DS Drop") != NULL);
+    assert(strstr(resp, "Upload Atomically to 3DS SD") != NULL);
+
     /* GET /api/scan */
     send_and_service(&srv, "GET /api/scan HTTP/1.1\r\nHost: localhost\r\n\r\n", resp, sizeof(resp));
     assert(strstr(resp, "HTTP/1.1 200 OK") != NULL);
