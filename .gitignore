@@ -1,0 +1,10 @@
+build/
+meta/icon.png
+meta/banner.png
+meta/audio.wav
+meta/banner.bnr
+meta/__pycache__/
+__pycache__/
+*.pyc
+*.bak
+*.tmp

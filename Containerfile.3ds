@@ -1,0 +1,25 @@
+# OCI Containerfile for building 3ds_pieceduel (.elf, .smdh, .3dsx, .cia)
+# Compatible with podman build or docker build.
+FROM docker.io/devkitpro/devkitarm:latest
+
+ENV DEVKITPRO=/opt/devkitpro
+ENV DEVKITARM=/opt/devkitpro/devkitARM
+ENV PATH="${DEVKITPRO}/tools/bin:${DEVKITARM}/bin:${PATH}"
+
+# Install makerom and bannertool for .cia/.bnr/.smdh packaging alongside preinstalled 3ds-dev
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    ca-certificates \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/* \
+    && if ! command -v makerom >/dev/null 2>&1; then \
+         curl -fsSL https://github.com/3DSGuy/Project_CTR/releases/download/makerom-v0.18.4/makerom-v0.18.4-ubuntu_x86_64.zip -o /tmp/makerom.zip && \
+         unzip -q /tmp/makerom.zip -d /usr/local/bin && chmod +x /usr/local/bin/makerom && rm -f /tmp/makerom.zip; \
+       fi \
+    && if ! command -v bannertool >/dev/null 2>&1; then \
+         curl -fsSL https://github.com/carstene1ns/3ds-bannertool/releases/download/1.2.3/bannertool-1.2.3-linux.tar.gz -o /tmp/bt.tar.gz && \
+         tar -xzf /tmp/bt.tar.gz -C /tmp && cp /tmp/bannertool-1.2.3-linux/bannertool /usr/local/bin/bannertool && chmod +x /usr/local/bin/bannertool && rm -rf /tmp/bt.tar.gz /tmp/bannertool-1.2.3-linux; \
+       fi
+
+WORKDIR /work
