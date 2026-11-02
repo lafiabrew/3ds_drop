@@ -133,6 +133,25 @@ int main(void) {
     assert(strstr(resp, "HTTP/1.1 200 OK") != NULL);
     assert(strstr(resp, "NEW_SAVE_V2!") != NULL);
 
+    /* Fail-the-Fail negative assertions: 404 on missing file, 404 on unknown endpoint, 400 on POST traversal */
+    send_and_service(&srv,
+                     "GET /api/pull?path=3ds/does_not_exist.sav HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                     resp, sizeof(resp));
+    assert(strstr(resp, "HTTP/1.1 404 Not Found") != NULL);
+
+    send_and_service(&srv,
+                     "GET /api/nonexistent HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                     resp, sizeof(resp));
+    assert(strstr(resp, "HTTP/1.1 404 Not Found") != NULL);
+
+    send_and_service(&srv,
+                     "POST /api/push?path=../escape.bin HTTP/1.1\r\nContent-Length: 4\r\n\r\nNOPE",
+                     resp, sizeof(resp));
+    assert(strstr(resp, "HTTP/1.1 400 Bad Request") != NULL);
+
+    struct stat log_st;
+    assert(stat("build/test_sd/3ds/logs/drop.log", &log_st) == 0 && log_st.st_size > 20);
+
     drop_server_shutdown(&srv);
     printf("PASS: test_drop all HTTP scan, log harvest, path-traversal guard, and atomic push/pull checks succeeded.\n");
     return 0;

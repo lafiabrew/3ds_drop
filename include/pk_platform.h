@@ -49,6 +49,13 @@ bool pk_platform_main_loop(void);
 void pk_platform_poll_input(pk_input_t *out_input);
 const char *pk_platform_default_sd_root(void);
 
+/* Append a structured timestamped telemetry line to <sd_root>/3ds/logs/<app_name>.log
+   so 3ds_drop (/api/logs) and pc_companion/sd_scanner.py harvest full operational traces */
+bool pk_log_event(const char *sd_root, const char *app_name, const char *level, const char *msg);
+
+/* Draw a vertical scrollbar track + thumb on the right edge of a scrollable viewport */
+void pk_draw_scrollbar(float x, float y, float h, int total_items, int visible_rows, int scroll_offset, uint32_t track_col, uint32_t thumb_col);
+
 void pk_render_begin_frame(void);
 void pk_render_begin_target(pk_render_target_t target, uint32_t clear_color);
 void pk_render_end_frame(void);

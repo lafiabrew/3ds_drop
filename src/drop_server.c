@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "drop_server.h"
+#include "pk_platform.h"
 
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -114,7 +115,7 @@ typedef struct {
 } json_list_ctx_t;
 
 static void walk_sd_files(const char *sd_root, const char *rel_dir, int depth, json_list_ctx_t *ctx) {
-    if (depth > 4 || ctx->count >= 64) return;
+    if (depth > 4 || ctx->count >= 128) return;
     char dir_path[DROP_PATH_MAX + 64];
     if (rel_dir[0] == '\0') {
         snprintf(dir_path, sizeof(dir_path), "%s", sd_root);
@@ -125,7 +126,7 @@ static void walk_sd_files(const char *sd_root, const char *rel_dir, int depth, j
     if (d == NULL) return;
 
     struct dirent *ent;
-    while ((ent = readdir(d)) != NULL && ctx->count < 64) {
+    while ((ent = readdir(d)) != NULL && ctx->count < 128) {
         if (ent->d_name[0] == '.') continue;
         if (depth == 0 && (strcmp(ent->d_name, "Nintendo 3DS") == 0 ||
                            strcmp(ent->d_name, "System Volume Information") == 0 ||
@@ -203,6 +204,11 @@ static void walk_sd_logs(const char *sd_root, const char *rel_dir, int depth, js
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL && ctx->count < 32) {
         if (ent->d_name[0] == '.') continue;
+        if (depth == 0 && (strcmp(ent->d_name, "Nintendo 3DS") == 0 ||
+                           strcmp(ent->d_name, "System Volume Information") == 0 ||
+                           strcmp(ent->d_name, "boot9strap") == 0)) {
+            continue;
+        }
         char rel_child[DROP_PATH_MAX];
         if (rel_dir[0] == '\0') {
             snprintf(rel_child, sizeof(rel_child), "%s", ent->d_name);
@@ -328,6 +334,7 @@ bool drop_server_init(drop_server_t *srv, const char *sd_root, uint16_t port) {
     drop_detect_local_ip(srv->ip_addr, sizeof(srv->ip_addr));
     snprintf(srv->last_event, sizeof(srv->last_event),
              "READY AT HTTP://%s:%u", srv->ip_addr, (unsigned)srv->port);
+    pk_log_event(srv->sd_root, "drop", "INFO", srv->last_event);
     return true;
 }
 
@@ -611,6 +618,7 @@ bool drop_server_poll_once(drop_server_t *srv, int timeout_ms) {
                     free(fbuf);
                     srv->files_pulled++;
                     snprintf(srv->last_event, sizeof(srv->last_event), "PULLED %.64s (%ld B)", rel, fsz);
+                    pk_log_event(srv->sd_root, "drop", "INFO", srv->last_event);
                 }
                 fclose(fp);
             }
@@ -664,6 +672,7 @@ bool drop_server_poll_once(drop_server_t *srv, int timeout_ms) {
             if (ok) {
                 srv->files_pushed++;
                 snprintf(srv->last_event, sizeof(srv->last_event), "PUSHED %.64s (%zu B)", rel, body_len);
+                pk_log_event(srv->sd_root, "drop", "INFO", srv->last_event);
                 char resp[320];
                 int rlen = snprintf(resp, sizeof(resp),
                                     "{\"status\":\"ok\",\"path\":\"%s\",\"bytes\":%zu}\n",

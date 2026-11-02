@@ -95,6 +95,68 @@ void pk_draw_text(float x, float y, float scale, uint32_t color, const char *tex
     pk_draw_rect(x, y, (float)(w > 0 ? w : 4), (float)(h > 0 ? h : 4), color);
 }
 
+
+#include <time.h>
+
+static void pk_ensure_dir_p(const char *dir_path) {
+    char tmp[640];
+    snprintf(tmp, sizeof(tmp), "%s", dir_path);
+    for (char *p = tmp + 1; *p != '\0'; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0777);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0777);
+}
+
+bool pk_log_event(const char *sd_root, const char *app_name, const char *level, const char *msg) {
+    if (sd_root == NULL || app_name == NULL || msg == NULL) return false;
+    if (strstr(app_name, "..") != NULL || strchr(app_name, '/') != NULL) return false;
+
+    char log_dir[576];
+    snprintf(log_dir, sizeof(log_dir), "%s/3ds/logs", sd_root);
+    pk_ensure_dir_p(log_dir);
+
+    char log_path[640];
+    snprintf(log_path, sizeof(log_path), "%s/%s.log", log_dir, app_name);
+    FILE *fp = fopen(log_path, "ab");
+    if (fp == NULL) return false;
+
+    char ts[24];
+    time_t now = time(NULL);
+    struct tm *tm_utc = gmtime(&now);
+    if (tm_utc != NULL && tm_utc->tm_year >= 120 &&
+        strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", tm_utc) == 19) {
+        /* use real UTC clock */
+    } else {
+        memcpy(ts, "2026-11-02 09:00:00", 20);
+    }
+
+    fprintf(fp, "[%s] [%s] [%s] %s\n", ts, app_name, level != NULL ? level : "INFO", msg);
+    fflush(fp);
+    fclose(fp);
+    return true;
+}
+
+void pk_draw_scrollbar(float x, float y, float h, int total_items, int visible_rows, int scroll_offset, uint32_t track_col, uint32_t thumb_col) {
+    pk_draw_rect(x, y, 4.0f, h, track_col);
+    if (total_items <= visible_rows || total_items <= 0) {
+        pk_draw_rect(x, y, 4.0f, h, thumb_col);
+        return;
+    }
+    float thumb_h = (h * (float)visible_rows) / (float)total_items;
+    if (thumb_h < 12.0f) thumb_h = 12.0f;
+    if (thumb_h > h) thumb_h = h;
+    int max_scroll = total_items - visible_rows;
+    float frac = max_scroll > 0 ? ((float)scroll_offset / (float)max_scroll) : 0.0f;
+    if (frac < 0.0f) frac = 0.0f;
+    if (frac > 1.0f) frac = 1.0f;
+    float thumb_y = y + frac * (h - thumb_h);
+    pk_draw_rect(x, thumb_y, 4.0f, thumb_h, thumb_col);
+}
+
 const uint32_t *pk_platform_host_get_framebuffer(pk_render_target_t target) {
     if (target == PK_TARGET_TOP_LEFT) return fb_top_l;
     if (target == PK_TARGET_TOP_RIGHT) return fb_top_r;
