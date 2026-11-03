@@ -6,6 +6,10 @@
   <img src="docs/banner.png" width="256" height="128" alt="3ds_drop 3DS banner" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshot.png" width="360" alt="3ds_drop dual-screen 3DS preview" />
+</p>
+
 > **Wireless SD File Server (`CTR-P-DROP`, UniqueId `0x0D3E3`)** — Part of the [**lafiabrew**](https://github.com/orgs/lafiabrew/repositories) Nintendo 3DS Homebrew Suite (companion hub: [`lafiabrew/3ds_hub`](https://github.com/lafiabrew/3ds_hub)).
 
 Zero-friction wireless LAN HTTP & Browser Web UI server (`:8766`) for scanning the 3DS SD card, harvesting crash/app logs, and atomically pushing/pulling Pokémon saves and ROM hacks with `.bak` backups.

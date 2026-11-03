@@ -66,7 +66,83 @@ void pk_render_begin_target(pk_render_target_t target, uint32_t clear_color) {
     }
 }
 
-void pk_render_end_frame(void) {}
+
+#include <ctype.h>
+#include <stdlib.h>
+
+static void get_glyph_5x7(char ch, uint8_t cols[5]) {
+    unsigned char uc = (unsigned char)toupper((unsigned char)ch);
+    switch (uc) {
+    case 'A': cols[0] = 0x7E; cols[1] = 0x11; cols[2] = 0x11; cols[3] = 0x11; cols[4] = 0x7E; break;
+    case 'B': cols[0] = 0x7F; cols[1] = 0x49; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x36; break;
+    case 'C': cols[0] = 0x3E; cols[1] = 0x41; cols[2] = 0x41; cols[3] = 0x41; cols[4] = 0x22; break;
+    case 'D': cols[0] = 0x7F; cols[1] = 0x41; cols[2] = 0x41; cols[3] = 0x22; cols[4] = 0x1C; break;
+    case 'E': cols[0] = 0x7F; cols[1] = 0x49; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x41; break;
+    case 'F': cols[0] = 0x7F; cols[1] = 0x09; cols[2] = 0x09; cols[3] = 0x09; cols[4] = 0x01; break;
+    case 'G': cols[0] = 0x3E; cols[1] = 0x41; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x7A; break;
+    case 'H': cols[0] = 0x7F; cols[1] = 0x08; cols[2] = 0x08; cols[3] = 0x08; cols[4] = 0x7F; break;
+    case 'I': cols[0] = 0x00; cols[1] = 0x41; cols[2] = 0x7F; cols[3] = 0x41; cols[4] = 0x00; break;
+    case 'J': cols[0] = 0x20; cols[1] = 0x40; cols[2] = 0x41; cols[3] = 0x3F; cols[4] = 0x01; break;
+    case 'K': cols[0] = 0x7F; cols[1] = 0x08; cols[2] = 0x14; cols[3] = 0x22; cols[4] = 0x41; break;
+    case 'L': cols[0] = 0x7F; cols[1] = 0x40; cols[2] = 0x40; cols[3] = 0x40; cols[4] = 0x40; break;
+    case 'M': cols[0] = 0x7F; cols[1] = 0x02; cols[2] = 0x0C; cols[3] = 0x02; cols[4] = 0x7F; break;
+    case 'N': cols[0] = 0x7F; cols[1] = 0x04; cols[2] = 0x08; cols[3] = 0x10; cols[4] = 0x7F; break;
+    case 'O': cols[0] = 0x3E; cols[1] = 0x41; cols[2] = 0x41; cols[3] = 0x41; cols[4] = 0x3E; break;
+    case 'P': cols[0] = 0x7F; cols[1] = 0x09; cols[2] = 0x09; cols[3] = 0x09; cols[4] = 0x06; break;
+    case 'Q': cols[0] = 0x3E; cols[1] = 0x41; cols[2] = 0x51; cols[3] = 0x21; cols[4] = 0x5E; break;
+    case 'R': cols[0] = 0x7F; cols[1] = 0x09; cols[2] = 0x19; cols[3] = 0x29; cols[4] = 0x46; break;
+    case 'S': cols[0] = 0x46; cols[1] = 0x49; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x31; break;
+    case 'T': cols[0] = 0x01; cols[1] = 0x01; cols[2] = 0x7F; cols[3] = 0x01; cols[4] = 0x01; break;
+    case 'U': cols[0] = 0x3F; cols[1] = 0x40; cols[2] = 0x40; cols[3] = 0x40; cols[4] = 0x3F; break;
+    case 'V': cols[0] = 0x1F; cols[1] = 0x20; cols[2] = 0x40; cols[3] = 0x20; cols[4] = 0x1F; break;
+    case 'W': cols[0] = 0x3F; cols[1] = 0x40; cols[2] = 0x38; cols[3] = 0x40; cols[4] = 0x3F; break;
+    case 'X': cols[0] = 0x63; cols[1] = 0x14; cols[2] = 0x08; cols[3] = 0x14; cols[4] = 0x63; break;
+    case 'Y': cols[0] = 0x07; cols[1] = 0x08; cols[2] = 0x70; cols[3] = 0x08; cols[4] = 0x07; break;
+    case 'Z': cols[0] = 0x61; cols[1] = 0x51; cols[2] = 0x49; cols[3] = 0x45; cols[4] = 0x43; break;
+    case '0': cols[0] = 0x3E; cols[1] = 0x51; cols[2] = 0x49; cols[3] = 0x45; cols[4] = 0x3E; break;
+    case '1': cols[0] = 0x00; cols[1] = 0x42; cols[2] = 0x7F; cols[3] = 0x40; cols[4] = 0x00; break;
+    case '2': cols[0] = 0x42; cols[1] = 0x61; cols[2] = 0x51; cols[3] = 0x49; cols[4] = 0x46; break;
+    case '3': cols[0] = 0x21; cols[1] = 0x41; cols[2] = 0x45; cols[3] = 0x4B; cols[4] = 0x31; break;
+    case '4': cols[0] = 0x18; cols[1] = 0x14; cols[2] = 0x12; cols[3] = 0x7F; cols[4] = 0x10; break;
+    case '5': cols[0] = 0x27; cols[1] = 0x45; cols[2] = 0x45; cols[3] = 0x45; cols[4] = 0x39; break;
+    case '6': cols[0] = 0x3C; cols[1] = 0x4A; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x30; break;
+    case '7': cols[0] = 0x01; cols[1] = 0x71; cols[2] = 0x09; cols[3] = 0x05; cols[4] = 0x03; break;
+    case '8': cols[0] = 0x36; cols[1] = 0x49; cols[2] = 0x49; cols[3] = 0x49; cols[4] = 0x36; break;
+    case '9': cols[0] = 0x06; cols[1] = 0x49; cols[2] = 0x49; cols[3] = 0x29; cols[4] = 0x1E; break;
+    case '-': cols[0] = 0x08; cols[1] = 0x08; cols[2] = 0x08; cols[3] = 0x08; cols[4] = 0x08; break;
+    case '+': cols[0] = 0x08; cols[1] = 0x08; cols[2] = 0x3E; cols[3] = 0x08; cols[4] = 0x08; break;
+    case ':': cols[0] = 0x00; cols[1] = 0x36; cols[2] = 0x36; cols[3] = 0x00; cols[4] = 0x00; break;
+    case '.': cols[0] = 0x00; cols[1] = 0x60; cols[2] = 0x60; cols[3] = 0x00; cols[4] = 0x00; break;
+    case ',': cols[0] = 0x00; cols[1] = 0x50; cols[2] = 0x30; cols[3] = 0x00; cols[4] = 0x00; break;
+    case '/': cols[0] = 0x20; cols[1] = 0x10; cols[2] = 0x08; cols[3] = 0x04; cols[4] = 0x02; break;
+    case '|': cols[0] = 0x00; cols[1] = 0x00; cols[2] = 0x7F; cols[3] = 0x00; cols[4] = 0x00; break;
+    case '(': cols[0] = 0x00; cols[1] = 0x1C; cols[2] = 0x22; cols[3] = 0x41; cols[4] = 0x00; break;
+    case ')': cols[0] = 0x00; cols[1] = 0x41; cols[2] = 0x22; cols[3] = 0x1C; cols[4] = 0x00; break;
+    case '[': cols[0] = 0x00; cols[1] = 0x7F; cols[2] = 0x41; cols[3] = 0x41; cols[4] = 0x00; break;
+    case ']': cols[0] = 0x00; cols[1] = 0x41; cols[2] = 0x41; cols[3] = 0x7F; cols[4] = 0x00; break;
+    case '#': cols[0] = 0x14; cols[1] = 0x7F; cols[2] = 0x14; cols[3] = 0x7F; cols[4] = 0x14; break;
+    case '$': cols[0] = 0x24; cols[1] = 0x2A; cols[2] = 0x7F; cols[3] = 0x2A; cols[4] = 0x12; break;
+    case '%': cols[0] = 0x23; cols[1] = 0x13; cols[2] = 0x08; cols[3] = 0x64; cols[4] = 0x62; break;
+    case '*': cols[0] = 0x14; cols[1] = 0x08; cols[2] = 0x3E; cols[3] = 0x08; cols[4] = 0x14; break;
+    case '_': cols[0] = 0x40; cols[1] = 0x40; cols[2] = 0x40; cols[3] = 0x40; cols[4] = 0x40; break;
+    case '=': cols[0] = 0x14; cols[1] = 0x14; cols[2] = 0x14; cols[3] = 0x14; cols[4] = 0x14; break;
+    case ' ': cols[0] = 0x00; cols[1] = 0x00; cols[2] = 0x00; cols[3] = 0x00; cols[4] = 0x00; break;
+    default:  cols[0] = 0x00; cols[1] = 0x3E; cols[2] = 0x22; cols[3] = 0x3E; cols[4] = 0x00; break;
+    }
+}
+
+void pk_render_end_frame(void) {
+    const char *dump_path = getenv("PK_DUMP_FRAMEBUFFER");
+    if (dump_path != NULL && dump_path[0] != '\0') {
+        FILE *fp = fopen(dump_path, "wb");
+        if (fp != NULL) {
+            fwrite(fb_top_l, sizeof(uint32_t), PK_TOP_WIDTH * PK_TOP_HEIGHT, fp);
+            fwrite(fb_bot, sizeof(uint32_t), PK_BOT_WIDTH * PK_BOT_HEIGHT, fp);
+            fclose(fp);
+        }
+    }
+}
+
 
 void pk_draw_rect(float x, float y, float w, float h, uint32_t color) {
     int x0 = (int)x < 0 ? 0 : (int)x;
@@ -88,11 +164,28 @@ void pk_draw_rect_outline(float x, float y, float w, float h, float t, uint32_t 
 }
 
 void pk_draw_text(float x, float y, float scale, uint32_t color, const char *text) {
-    if (text == NULL) return;
-    int len = (int)strlen(text);
-    int w = (int)(len * 6.0f * scale);
-    int h = (int)(8.0f * scale);
-    pk_draw_rect(x, y, (float)(w > 0 ? w : 4), (float)(h > 0 ? h : 4), color);
+    if (text == NULL || text[0] == '\0') return;
+    (void)scale;
+    int cur_x = (int)x;
+    int base_y = (int)y + 2;
+    for (size_t i = 0; text[i] != '\0'; i++) {
+        if (cur_x + 5 >= g_w - 2) break;
+        uint8_t cols[5];
+        get_glyph_5x7(text[i], cols);
+        for (int col = 0; col < 5; col++) {
+            uint8_t bits = cols[col];
+            for (int row = 0; row < 7; row++) {
+                if ((bits >> row) & 1u) {
+                    int px = cur_x + col;
+                    int py = base_y + row;
+                    if (px >= 0 && px < g_w && py >= 0 && py < g_h) {
+                        g_fb[py * g_w + px] = color;
+                    }
+                }
+            }
+        }
+        cur_x += 6;
+    }
 }
 
 
