@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "repo": "3ds_drop",
+  "publish_enabled": false,
+  "channel": "stable",
+  "reason": "No qualified exact-source app coordinator approval received",
+  "native_target": "3ds-native",
+  "artifact_dir": "build/3ds",
+  "cia_asset": "3ds_drop.cia",
+  "host_commands": [
+    [
+      "make",
+      "test"
+    ]
+  ],
+  "native_commands": [
+    [
+      "make",
+      "3ds-native"
+    ],
+    [
+      "make",
+      "verify-3ds"
+    ]
+  ],
+  "extra_engine_check": false
+}
